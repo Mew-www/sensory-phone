@@ -3,6 +3,7 @@ package com.example.mew.gpstesting;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -17,7 +18,6 @@ import android.os.Bundle;
 import android.widget.TextView;
 
 import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -64,8 +64,6 @@ public class MainActivity extends AppCompatActivity {
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
 
-        // Open config menu
-        //startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
 
         // Show some UI, for debug purposes
         setContentView(R.layout.activity_main);
@@ -78,24 +76,7 @@ public class MainActivity extends AppCompatActivity {
             // Try to retrieve system location service
             LocationManager loc_manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             if (loc_manager != null) {
-                String gps_active = loc_manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ? "GPS is enabled" : "GPS is disabled";
-                String network_active = loc_manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ? "Network is enabled" : "Network is disabled";
-                String passive_active = loc_manager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER) ? "Passive is enabled" : "Passive is disabled";
-                updateHeaderInfo(gps_active + '\n' + network_active + '\n' + passive_active);
-                // Check last known location via most accurate -> least accurate provider
-                Location last_gps_location = loc_manager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                Location last_network_location = loc_manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                Location last_passive_location = loc_manager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
-                if (last_gps_location != null) {
-                    updateLocationInfo(last_gps_location);
-                } else if (last_network_location != null) {
-                    updateLocationInfo(last_network_location);
-                } else if (last_passive_location != null) {
-                    updateLocationInfo(last_passive_location);
-                }
-                loc_manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, listener);
-                loc_manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, listener);
-                loc_manager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 5000, 0, listener);
+                attachLocationListenerToLocationManager(loc_manager, listener);
             }
         }
     }
@@ -103,38 +84,42 @@ public class MainActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     public void onRequestPermissionsResult(int request_code, String[] perms, int[] request_results) {
-        if (request_code == location_perm_request_code && PackageManager.PERMISSION_GRANTED == checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+        if (request_code == location_perm_request_code) {
             LocationManager loc_manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             if (loc_manager != null) {
-                String gps_active = loc_manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ? "GPS is enabled" : "GPS is disabled";
-                String network_active = loc_manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ? "Network is enabled" : "Network is disabled";
-                String passive_active = loc_manager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER) ? "Passive is enabled" : "Passive is disabled";
-                updateHeaderInfo(gps_active + '\n' + network_active + '\n' + passive_active);
-                // Check last known location via most accurate -> least accurate provider
-                Location last_gps_location = loc_manager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                Location last_network_location = loc_manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                Location last_passive_location = loc_manager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
-                if (last_gps_location != null) {
-                    updateLocationInfo(last_gps_location);
-                } else if (last_network_location != null) {
-                    updateLocationInfo(last_network_location);
-                } else if (last_passive_location != null) {
-                    updateLocationInfo(last_passive_location);
-                }
-                loc_manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, listener);
-                loc_manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, listener);
-                loc_manager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 5000, 0, listener);
+                attachLocationListenerToLocationManager(loc_manager, listener);
             }
         }
     }
 
-    private void updateHeaderInfo(String s) {
-        TextView text = findViewById(R.id.headerTextView);
-        text.setText(s);
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    private void attachLocationListenerToLocationManager(LocationManager loc_manager, LocationListener listener) {
+        if (PackageManager.PERMISSION_GRANTED == checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            boolean gps_enabled = loc_manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+            boolean network_enabled = loc_manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+            boolean passive_enabled = loc_manager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER);
+            if (!gps_enabled || !network_enabled || !passive_enabled) {
+                // Open config menu
+                startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+            }
+            // Check last known location via most accurate -> least accurate provider
+            Location last_gps_location = loc_manager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            Location last_network_location = loc_manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            Location last_passive_location = loc_manager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+            if (last_gps_location != null) {
+                updateLocationInfo(last_gps_location);
+            } else if (last_network_location != null) {
+                updateLocationInfo(last_network_location);
+            } else if (last_passive_location != null) {
+                updateLocationInfo(last_passive_location);
+            }
+            loc_manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, listener);
+            loc_manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, listener);
+            loc_manager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 5000, 0, listener);
+        }
     }
 
     private void updateLocationInfo(Location location) {
-        TextView text = findViewById(R.id.locationText);
         String geocoded_address_locality = "Unavailable";
         try {
             Geocoder gcd = new Geocoder(getBaseContext(), Locale.getDefault());
@@ -145,15 +130,6 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        String loc_str = "" +
-                "Longitude: " + location.getLongitude() + '\n' +
-                "Latitude: " + location.getLatitude() + '\n' +
-                "Geocoded City:  " + geocoded_address_locality + '\n' +
-                "Accuracy (m): " + location.getAccuracy() + '\n' +
-                "Speed (m/s): " + location.getProvider() + '\n' +
-                "Timestamp: " + ms_to_simpledate(location.getTime()) + '\n' +
-                "Provider name: " + location.getProvider();
-        text.setText(loc_str);
         HttpURLConnection conn = null;
         try {
             URL url = new URL(BuildConfig.LOCATION_API);
@@ -196,5 +172,9 @@ public class MainActivity extends AppCompatActivity {
                 conn.disconnect();
             }
         }
+        TextView text = findViewById(R.id.headerTextView);
+        // Go around the "use i18n placeholders" check using this... prefer not to suppress the warn
+        String s = "Updated " +ms_to_simpledate(location.getTime());
+        text.setText(s);
     }
 }
